@@ -1,0 +1,35 @@
+# Backend
+backend/.env
+backend/.env.local
+backend/__pycache__/
+backend/*.pyc
+backend/venv/
+backend/env/
+backend/ml/model.pkl
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# ML
+ml/__pycache__/
+ml/*.pyc
+ml/data.csv
+ml/model.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+*.egg-info/
+.pytest_cache/
+.coverage

@@ -1,0 +1,15 @@
+.leaflet-container {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.map-shell {
+  height: 70vh;
+  min-height: 520px;
+}
+
+@media (max-width: 1024px) {
+  .map-shell {
+    height: 60vh;
+    min-height: 420px;
+  }
+}
