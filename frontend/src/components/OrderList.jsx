@@ -18,6 +18,17 @@ const timelineTone = {
 
 const formatPrice = (value) => `Rs. ${(value || 0).toFixed(2)}`;
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : "Not available");
+const getDeliveryEtaCopy = (order) => {
+  if (order.fulfillment_mode === "takeaway") {
+    return `Pickup is expected around ${formatDateTime(order.pickup_ready_at)} at Cloud Kitchen Express, Hyderabad.`;
+  }
+
+  if ((order.assigned_batch_size || 1) > 1 && order.route_stop_number) {
+    return `Your order is in a ${order.assigned_batch_size}-drop nearby batch. Current ETA is about ${order.predicted_eta_minutes} minutes, and your stop number is ${order.route_stop_number}.`;
+  }
+
+  return `Your rider flow is running. Current ETA is about ${order.predicted_eta_minutes} minutes for ${order.delivery_area || "your drop location"}.`;
+};
 
 export default function OrderList({ orders, onRefresh, highlightedOrderId }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -70,11 +81,7 @@ export default function OrderList({ orders, onRefresh, highlightedOrderId }) {
               <h3 className="mt-2 text-3xl font-black text-slate-950">
                 Order #{highlightedOrder.id.slice(-6)} is {statusLabels[highlightedOrder.status]?.toLowerCase() || highlightedOrder.status}.
               </h3>
-              <p className="mt-3 text-sm text-slate-600">
-                {highlightedOrder.fulfillment_mode === "takeaway"
-                  ? `Pickup is expected around ${formatDateTime(highlightedOrder.pickup_ready_at)} at Cloud Kitchen Express, Hyderabad.`
-                  : `Your rider flow is running. Current ETA is about ${highlightedOrder.predicted_eta_minutes} minutes for ${highlightedOrder.delivery_area || "your drop location"}.`}
-              </p>
+              <p className="mt-3 text-sm text-slate-600">{getDeliveryEtaCopy(highlightedOrder)}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {(highlightedOrder.items || []).map((item) => (
                   <span
@@ -176,6 +183,14 @@ export default function OrderList({ orders, onRefresh, highlightedOrderId }) {
                         : `${order.predicted_eta_minutes} min`}
                     </span>
                   </p>
+                  {order.fulfillment_mode !== "takeaway" && (order.assigned_batch_size || 1) > 1 ? (
+                    <p>
+                      Batch:{" "}
+                      <span className="font-semibold text-slate-900">
+                        {order.assigned_batch_size} drops, stop {order.route_stop_number}
+                      </span>
+                    </p>
+                  ) : null}
                   <p>
                     {order.fulfillment_mode === "takeaway" ? "Pickup point" : "Rider"}:{" "}
                     <span className="font-semibold text-slate-900">
@@ -267,6 +282,19 @@ export default function OrderList({ orders, onRefresh, highlightedOrderId }) {
                   <p>
                     Travel: <span className="font-semibold text-slate-900">{order.predicted_travel_minutes} min</span>
                   </p>
+                  {order.fulfillment_mode !== "takeaway" && order.estimated_delivery_at ? (
+                    <p>
+                      Delivery by: <span className="font-semibold text-slate-900">{formatDateTime(order.estimated_delivery_at)}</span>
+                    </p>
+                  ) : null}
+                  {order.fulfillment_mode !== "takeaway" && (order.assigned_batch_size || 1) > 1 ? (
+                    <p>
+                      Route position:{" "}
+                      <span className="font-semibold text-slate-900">
+                        Stop {order.route_stop_number} of {order.assigned_batch_size} in this nearby batch
+                      </span>
+                    </p>
+                  ) : null}
                   {order.fulfillment_mode === "takeaway" ? (
                     <p>
                       Pickup ready at: <span className="font-semibold text-slate-900">{formatDateTime(order.pickup_ready_at)}</span>

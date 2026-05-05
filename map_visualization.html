@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Kitchen – Hyderabad Delivery Map</title>
+  <meta name="description" content="Interactive map showing multi-branch cloud kitchen delivery distribution across Hyderabad." />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --text:     #e6edf3;
+      --muted:    #8b949e;
+      --accent:   #58a6ff;
+
+      --b1: #f97316;   /* Kukatpally   – orange   */
+      --b2: #22d3ee;   /* HITEC City   – cyan     */
+      --b3: #a78bfa;   /* Secunderabad – violet   */
+      --b4: #34d399;   /* LB Nagar     – emerald  */
+      --b5: #fb7185;   /* Mehdipatnam  – rose     */
+    }
+
+    html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── Layout ── */
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── Header ── */
+    #header {
+      display: flex; align-items: center; gap: 16px;
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 1000;
+    }
+    #header h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.3px; }
+    #header h1 span { color: var(--accent); }
+    #header .badge {
+      font-size: 0.7rem; font-weight: 500;
+      background: rgba(88,166,255,.15); color: var(--accent);
+      border: 1px solid rgba(88,166,255,.3);
+      border-radius: 20px; padding: 2px 10px;
+    }
+    #stats-bar {
+      display: flex; gap: 24px; margin-left: auto; align-items: center;
+    }
+    .stat { text-align: right; }
+    .stat-val { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+    .stat-lbl { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+    /* ── Body: map + sidebar ── */
+    #body { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 260px; flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .panel-title {
+      font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted); margin-bottom: 8px;
+    }
+
+    /* Branch legend cards */
+    .branch-card {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border);
+      cursor: pointer; transition: all .2s;
+    }
+    .branch-card:hover { border-color: var(--accent); background: rgba(88,166,255,.05); }
+    .branch-card.active { border-color: var(--accent); background: rgba(88,166,255,.08); }
+    .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .branch-info { flex: 1; }
+    .branch-name  { font-size: 0.82rem; font-weight: 600; }
+    .branch-count { font-size: 0.7rem; color: var(--muted); }
+    .branch-pct   { font-size: 0.7rem; font-weight: 600; margin-left: auto; }
+
+    /* Controls */
+    .control-group { display: flex; flex-direction: column; gap: 8px; }
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.8rem;
+    }
+    .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: var(--border); border-radius: 20px; transition: .3s;
+    }
+    .slider::before {
+      content: ''; position: absolute;
+      width: 14px; height: 14px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%; transition: .3s;
+    }
+    input:checked + .slider { background: var(--accent); }
+    input:checked + .slider::before { transform: translateX(16px); }
+
+    /* Progress bars */
+    .prog-wrap { margin-top: 6px; }
+    .prog-bar-bg { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .prog-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+
+    /* ── Map ── */
+    #map { height: 100%; width: 100%; position: relative; }
+
+    /* ── Loading overlay ── */
+    #loading {
+      position: absolute; inset: 0; z-index: 9999;
+      background: var(--bg);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    }
+    .spinner {
+      width: 48px; height: 48px; border-radius: 50%;
+      border: 4px solid var(--border); border-top-color: var(--accent);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: var(--muted); font-size: 0.9rem; }
+
+    /* ── Custom Leaflet styles ── */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 10px !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5) !important;
+    }
+    .leaflet-popup-tip { background: var(--surface) !important; }
+    .leaflet-popup-content { font-family: 'Inter', sans-serif !important; font-size: 0.8rem !important; }
+    .popup-header { font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; }
+    .popup-row { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); }
+    .popup-row span:last-child { color: var(--text); font-weight: 500; }
+
+    /* branch marker pulse */
+    .branch-marker-pin {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 0 0 3px rgba(255,255,255,.25);
+    }
+
+    /* error banner */
+    #error-banner {
+      display: none; position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 5000; background: #450a0a; border: 1px solid #f87171;
+      color: #fca5a5; padding: 10px 20px; border-radius: 8px; font-size: 0.83rem;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <header id="header">
+    <div>
+      <h1><i class="fa-solid fa-cloud" style="color:var(--accent);"></i> Cloud Kitchen &nbsp;<span>Delivery Map</span></h1>
+    </div>
+    <span class="badge">Hyderabad · Live Simulation</span>
+    <div id="stats-bar">
+      <div class="stat">
+        <div class="stat-val" id="stat-orders">–</div>
+        <div class="stat-lbl">Simulated Orders</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="stat-avg-dist">–</div>
+        <div class="stat-lbl">Avg Distance (km)</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="stat-branches">5</div>
+        <div class="stat-lbl">Branches</div>
+      </div>
+    </div>
+  </header>
+
+  <div id="body">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div>
+        <div class="panel-title">Branches</div>
+        <div id="branch-legend" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <div>
+        <div class="panel-title">Display Options</div>
+        <div class="control-group">
+          <div class="toggle-row">
+            <span>Order Points</span>
+            <label class="switch"><input type="checkbox" id="tog-orders" checked /><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span>Branch Circles</span>
+            <label class="switch"><input type="checkbox" id="tog-circles" checked /><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span>Order Clusters</span>
+            <label class="switch"><input type="checkbox" id="tog-cluster" /><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span>Branch → Order Lines</span>
+            <label class="switch"><input type="checkbox" id="tog-lines" /><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span>Optimized Branches (ML)</span>
+            <label class="switch"><input type="checkbox" id="tog-opt" /><span class="slider" style="background:var(--border);"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-title">Order Distribution</div>
+        <div id="dist-chart" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+    </aside>
+
+    <!-- Map -->
+    <div style="position:relative;flex:1;">
+      <div id="loading">
+        <div class="spinner"></div>
+        <p id="loading-text">Fetching simulation data…</p>
+      </div>
+      <div id="error-banner"></div>
+      <div id="map"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────────────
+const API_BASE = 'http://localhost:8000';
+
+const BRANCH_COLORS = {
+  b1: '#f97316',
+  b2: '#22d3ee',
+  b3: '#a78bfa',
+  b4: '#34d399',
+  b5: '#fb7185',
+};
+
+// ── Map init ───────────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [17.3850, 78.4867],
+  zoom: 11,
+  zoomControl: true,
+  attributionControl: true,
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap, © CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19,
+}).addTo(map);
+
+// ── Layer groups ──────────────────────────────────────────────────────────────
+const branchMarkerLayer = L.layerGroup().addTo(map);
+const circleLayer       = L.layerGroup().addTo(map);
+const orderLayer        = L.layerGroup().addTo(map);
+const lineLayer         = L.layerGroup();   // off by default
+const optimizedLayer    = L.layerGroup();   // off by default
+const clusterLayer      = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 40 });
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let allOrders   = [];
+let allBranches = [];
+let optBranches = [];
+let activeBranch = null;   // null = show all
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+function branchColor(id) {
+  return BRANCH_COLORS[id] || '#888';
+}
+
+function circleSvg(color) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10">
+    <circle cx="5" cy="5" r="4" fill="${color}" />
+  </svg>`;
+}
+
+// ── Branch markers ─────────────────────────────────────────────────────────────
+function renderBranchMarkers(branches) {
+  branchMarkerLayer.clearLayers();
+  circleLayer.clearLayers();
+
+  branches.forEach(b => {
+    const color = branchColor(b.id);
+
+    // Pulsing icon
+    const icon = L.divIcon({
+      className: '',
+      html: `
+        <div style="position:relative;width:36px;height:36px">
+          <div style="
+            position:absolute;inset:0;border-radius:50%;
+            background:${color};opacity:.25;
+            animation:pulse 2s ease-out infinite;
+          "></div>
+          <div style="
+            position:absolute;top:6px;left:6px;
+            width:24px;height:24px;border-radius:50%;
+            background:${color};border:3px solid #fff;
+            box-shadow:0 0 12px ${color};
+            display:flex;align-items:center;justify-content:center;
+          ">
+            <i class="fa-solid fa-store" style="color:#fff;font-size:10px;"></i>
+          </div>
+        </div>`,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+    });
+
+    const marker = L.marker([b.lat, b.lng], { icon, zIndexOffset: 1000 });
+    marker.bindPopup(`
+      <div class="popup-header" style="color:${color}"><i class="fa-solid fa-utensils"></i> ${b.name}</div>
+      <div class="popup-row"><span>Branch ID</span><span>${b.id.toUpperCase()}</span></div>
+      <div class="popup-row"><span>Coordinates</span><span>${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}</span></div>
+      <div class="popup-row"><span>Coverage Radius</span><span>10 km</span></div>
+    `);
+    branchMarkerLayer.addLayer(marker);
+
+    // 10 km radius circle
+    const circle = L.circle([b.lat, b.lng], {
+      radius: 10000,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.06,
+      weight: 1.5,
+      dashArray: '6 4',
+    });
+    circle.bindTooltip(`${b.name} – 10 km zone`, { sticky: true, className: '' });
+    circleLayer.addLayer(circle);
+  });
+}
+
+// ── Optimized Branch markers ───────────────────────────────────────────────────
+function renderOptimizedBranches(branches) {
+  optimizedLayer.clearLayers();
+
+  branches.forEach(b => {
+    const color = '#22c55e'; // Green for optimized branches
+
+    const icon = L.divIcon({
+      className: '',
+      html: `
+        <div style="position:relative;width:36px;height:36px">
+          <div style="
+            position:absolute;inset:0;border-radius:50%;
+            background:${color};opacity:.25;
+            animation:pulse 2s ease-out infinite;
+          "></div>
+          <div style="
+            position:absolute;top:6px;left:6px;
+            width:24px;height:24px;border-radius:50%;
+            background:${color};border:3px dashed #fff;
+            box-shadow:0 0 12px ${color};
+            display:flex;align-items:center;justify-content:center;
+          ">
+            <i class="fa-solid fa-bolt" style="color:#fff;font-size:10px;"></i>
+          </div>
+        </div>`,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+    });
+
+    const marker = L.marker([b.lat, b.lng], { icon, zIndexOffset: 1100 });
+    marker.bindPopup(`
+      <div class="popup-header" style="color:${color}"><i class="fa-solid fa-crosshairs"></i> ${b.name}</div>
+      <div class="popup-row"><span>Branch ID</span><span>${b.id.toUpperCase()}</span></div>
+      <div class="popup-row"><span>Coordinates</span><span>${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}</span></div>
+      <div class="popup-row"><span>Type</span><span>ML Optimized</span></div>
+    `);
+    optimizedLayer.addLayer(marker);
+  });
+}
+
+// ── Order dots ─────────────────────────────────────────────────────────────────
+function renderOrders(orders, filterBranch = null) {
+  orderLayer.clearLayers();
+  lineLayer.clearLayers();
+  clusterLayer.clearLayers();
+
+  const filtered = filterBranch
+    ? orders.filter(o => o.branch_id === filterBranch)
+    : orders;
+
+  const useCluster = document.getElementById('tog-cluster').checked;
+  const showLines  = document.getElementById('tog-lines').checked;
+
+  // Branch lookup map
+  const branchMap = {};
+  allBranches.forEach(b => { branchMap[b.id] = b; });
+
+  filtered.forEach(o => {
+    const color = branchColor(o.branch_id);
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:18px;height:18px;border-radius:50%;
+        background:${color};
+        box-shadow:0 0 4px rgba(${hexToRgb(color)},.7);
+        border:2px solid #fff;
+        display:flex;align-items:center;justify-content:center;
+      "><i class="fa-solid fa-bag-shopping" style="color:#fff;font-size:8px;"></i></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+
+    const marker = L.marker([o.lat, o.lng], { icon });
+    const bName  = allBranches.find(b => b.id === o.branch_id)?.name || o.branch_id;
+    marker.bindPopup(`
+      <div class="popup-header" style="color:${color}"><i class="fa-solid fa-location-dot"></i> Delivery Point</div>
+      <div class="popup-row"><span>Branch</span><span>${bName}</span></div>
+      <div class="popup-row"><span>Distance</span><span>${o.distance_km} km</span></div>
+      <div class="popup-row"><span>Est. Time</span><span>${o.estimated_delivery_time || 'N/A'}</span></div>
+      <div class="popup-row"><span>Coords</span><span>${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}</span></div>
+    `);
+
+    if (useCluster) {
+      clusterLayer.addLayer(marker);
+    } else {
+      orderLayer.addLayer(marker);
+    }
+
+    // Optional lines
+    if (showLines) {
+      const branch = branchMap[o.branch_id];
+      if (branch) {
+        const line = L.polyline([[branch.lat, branch.lng], [o.lat, o.lng]], {
+          color: color, weight: 0.5, opacity: 0.25,
+        });
+        lineLayer.addLayer(line);
+      }
+    }
+  });
+
+  if (useCluster && map.hasLayer(clusterLayer) === false) {
+    map.addLayer(clusterLayer);
+  }
+}
+
+// ── Sidebar legend ─────────────────────────────────────────────────────────────
+function renderLegend(branches, orders) {
+  const total = orders.length;
+  const counts = {};
+  orders.forEach(o => { counts[o.branch_id] = (counts[o.branch_id] || 0) + 1; });
+
+  const legendEl = document.getElementById('branch-legend');
+  const distEl   = document.getElementById('dist-chart');
+  legendEl.innerHTML = '';
+  distEl.innerHTML   = '';
+
+  branches.forEach(b => {
+    const color = branchColor(b.id);
+    const cnt   = counts[b.id] || 0;
+    const pct   = total ? Math.round(cnt / total * 100) : 0;
+
+    // Legend card
+    const card = document.createElement('div');
+    card.className = 'branch-card';
+    card.dataset.id = b.id;
+    card.innerHTML = `
+      <div style="width:24px;height:24px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="fa-solid fa-store" style="color:#fff;font-size:10px;"></i>
+      </div>
+      <div class="branch-info">
+        <div class="branch-name">${b.name}</div>
+        <div class="branch-count">${cnt.toLocaleString()} orders</div>
+      </div>
+      <div class="branch-pct" style="color:${color}">${pct}%</div>
+    `;
+    card.addEventListener('click', () => toggleBranchFilter(b.id, card));
+    legendEl.appendChild(card);
+
+    // Distribution bar
+    const row = document.createElement('div');
+    row.innerHTML = `
+      <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px">
+        <span>${b.name}</span>
+        <span style="color:${color};font-weight:600">${cnt}</span>
+      </div>
+      <div class="prog-bar-bg">
+        <div class="prog-bar-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+    `;
+    distEl.appendChild(row);
+  });
+}
+
+// ── Branch filter ──────────────────────────────────────────────────────────────
+function toggleBranchFilter(id, cardEl) {
+  const cards = document.querySelectorAll('.branch-card');
+  if (activeBranch === id) {
+    activeBranch = null;
+    cards.forEach(c => c.classList.remove('active'));
+  } else {
+    activeBranch = id;
+    cards.forEach(c => c.classList.toggle('active', c.dataset.id === id));
+  }
+  renderOrders(allOrders, activeBranch);
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+function updateStats(orders) {
+  document.getElementById('stat-orders').textContent = orders.length.toLocaleString();
+  const avgDist = orders.reduce((s, o) => s + o.distance_km, 0) / (orders.length || 1);
+  document.getElementById('stat-avg-dist').textContent = avgDist.toFixed(2);
+}
+
+// ── Toggle handlers ────────────────────────────────────────────────────────────
+document.getElementById('tog-orders').addEventListener('change', e => {
+  if (e.target.checked) { map.addLayer(orderLayer); map.addLayer(clusterLayer); }
+  else { map.removeLayer(orderLayer); map.removeLayer(clusterLayer); }
+});
+document.getElementById('tog-circles').addEventListener('change', e => {
+  if (e.target.checked) map.addLayer(circleLayer);
+  else map.removeLayer(circleLayer);
+});
+document.getElementById('tog-cluster').addEventListener('change', () => {
+  renderOrders(allOrders, activeBranch);
+});
+document.getElementById('tog-lines').addEventListener('change', e => {
+  if (e.target.checked) { map.addLayer(lineLayer); renderOrders(allOrders, activeBranch); }
+  else map.removeLayer(lineLayer);
+});
+document.getElementById('tog-opt').addEventListener('change', e => {
+  if (e.target.checked) map.addLayer(optimizedLayer);
+  else map.removeLayer(optimizedLayer);
+});
+
+// ── Fetch & render ─────────────────────────────────────────────────────────────
+async function fetchAndRender() {
+  try {
+    document.getElementById('loading-text').textContent = 'Fetching simulation data…';
+    const res = await fetch(`${API_BASE}/internal/map-data?limit=5000`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const data = await res.json();
+
+    allBranches = data.branches;
+    allOrders   = data.orders.filter(o => o.lat != null && o.lng != null);
+
+    renderBranchMarkers(allBranches);
+    renderOrders(allOrders);
+    renderLegend(allBranches, allOrders);
+    updateStats(allOrders);
+
+    // Fetch optimized branches separately
+    try {
+      const optRes = await fetch(`${API_BASE}/internal/optimized-branches`);
+      if (optRes.ok) {
+        optBranches = await optRes.json();
+        renderOptimizedBranches(optBranches);
+      }
+    } catch (e) {
+      console.warn("Optimized branches not found or not yet generated.", e);
+    }
+
+    document.getElementById('loading').style.display = 'none';
+
+    // Fit map to order bounds if data exists
+    if (allOrders.length > 0) {
+      const latlngs = allOrders.map(o => [o.lat, o.lng]);
+      map.fitBounds(L.latLngBounds(latlngs).pad(0.05));
+    }
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    const banner = document.getElementById('error-banner');
+    banner.textContent = `⚠️ Could not load data: ${err.message}. Make sure the API is running on ${API_BASE} and simulation has been run.`;
+    banner.style.display = 'block';
+    console.error(err);
+  }
+}
+
+// ── Pulse keyframe via JS (avoids CSP inline-style issues) ────────────────────
+const style = document.createElement('style');
+style.textContent = `@keyframes pulse {
+  0%   { transform: scale(1);   opacity: .4; }
+  70%  { transform: scale(2.2); opacity: 0;  }
+  100% { transform: scale(1);   opacity: 0;  }
+}`;
+document.head.appendChild(style);
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+fetchAndRender();
+</script>
+</body>
+</html>

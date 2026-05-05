@@ -1,15 +1,229 @@
-.leaflet-container {
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+.ck-app {
+  --primary: #ff7a00;
+  --primary-dark: #ea580c;
+  --secondary: #ffc857;
+  --background: #f5f5f5;
+  --dark: #1f2937;
+  --text: #111827;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(255, 122, 0, 0.09) 0%, rgba(255, 200, 87, 0.12) 42%, rgba(245, 245, 245, 0.98) 100%),
+    var(--background);
+  color: var(--text);
+}
+
+.ck-app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at top left, rgba(255, 122, 0, 0.14), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(255, 200, 87, 0.18), transparent 28%);
+}
+
+.ck-app * {
+  letter-spacing: 0;
+}
+
+.ck-app h1,
+.ck-app h2,
+.ck-app h3,
+.ck-app h4 {
+  color: var(--text);
+  font-family: "Poppins", "Inter", system-ui, sans-serif;
+  font-weight: 700;
+}
+
+.ck-app header {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: var(--line) !important;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 1px 0 rgba(17, 24, 39, 0.05);
+}
+
+.ck-app aside,
+.ck-sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%) !important;
+  border-color: var(--line) !important;
+}
+
+.ck-app main {
+  background: linear-gradient(180deg, rgba(245, 245, 245, 0.72), rgba(255, 247, 237, 0.42));
+}
+
+.ck-sidebar {
+  box-shadow: 18px 0 42px rgba(17, 24, 39, 0.2);
+  will-change: transform;
+}
+
+.ck-sidebar-backdrop {
+  background: rgba(31, 41, 55, 0.44);
+  backdrop-filter: blur(4px);
+}
+
+.ck-menu-button span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--dark);
+}
+
+.ck-app [class*="rounded-["] {
+  border-radius: 1rem !important;
+}
+
+.ck-app [class*="bg-slate-950"],
+.ck-app [class*="bg-slate-900"] {
+  background: var(--dark) !important;
+}
+
+.ck-app [class*="bg-orange-500"],
+.ck-app [class*="bg-blue-600"] {
+  background: var(--primary) !important;
+}
+
+.ck-app [class*="hover:bg-orange-600"]:hover,
+.ck-app [class*="hover:bg-blue-700"]:hover {
+  background: var(--primary-dark) !important;
+}
+
+.ck-app [class*="text-orange-"],
+.ck-app [class*="text-blue-"] {
+  color: var(--primary) !important;
+}
+
+.ck-app [class*="bg-orange-50"] {
+  background-color: #fff7ed !important;
+}
+
+.ck-app [class*="bg-orange-100"] {
+  background-color: #ffedd5 !important;
+}
+
+.ck-app [class*="text-orange-700"] {
+  color: #c2410c !important;
+}
+
+.ck-app [class*="text-slate-500"],
+.ck-app [class*="text-slate-600"] {
+  color: var(--muted) !important;
+}
+
+.ck-app [class*="text-slate-900"],
+.ck-app [class*="text-slate-950"] {
+  color: var(--text) !important;
+}
+
+.ck-app [class*="ring-orange"],
+.ck-app [class*="ring-slate"],
+.ck-app [class*="border-orange"],
+.ck-app [class*="border-slate"],
+.ck-app [class*="border-gray"] {
+  border-color: var(--line) !important;
+  --tw-ring-color: var(--line) !important;
+}
+
+.ck-app button,
+.ck-app input,
+.ck-app select,
+.ck-app textarea {
+  font: inherit;
+  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.ck-app button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.ck-app input,
+.ck-app select,
+.ck-app textarea {
+  border-color: var(--line) !important;
+  background: #fff !important;
+}
+
+.ck-app input:focus,
+.ck-app select:focus,
+.ck-app textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.24) !important;
+}
+
+.ck-sidebar-card,
+.ck-stat-card {
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.ck-nav-button {
+  border: 1px solid var(--line);
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.ck-nav-button.is-active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.ck-command-button {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border: 1px solid var(--primary) !important;
+}
+
+.ck-command-button:hover:not(:disabled) {
+  background: var(--primary-dark) !important;
+  box-shadow: 0 14px 30px rgba(255, 122, 0, 0.28);
+}
+
+.ck-menu-card {
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  background: #fff;
+}
+
+.ck-menu-card:hover {
+  box-shadow: 0 22px 45px rgba(17, 24, 39, 0.14);
+}
+
+.ck-toast {
+  animation: ck-toast-in 220ms ease-out both;
+}
+
+@keyframes ck-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ck-mobile-tabbar {
+  scrollbar-width: none;
+}
+
+.ck-mobile-tabbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .ck-app [class*="text-5xl"],
+  .ck-app [class*="text-6xl"] {
+    font-size: 2rem !important;
+    line-height: 2.35rem !important;
+  }
 }
 
 .map-shell {
+  min-height: 600px;
   height: 70vh;
-  min-height: 520px;
-}
-
-@media (max-width: 1024px) {
-  .map-shell {
-    height: 60vh;
-    min-height: 420px;
-  }
+  width: 100%;
 }

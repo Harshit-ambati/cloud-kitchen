@@ -47,55 +47,65 @@ export default function AgentForm({ onAgentCreated }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6 max-w-md space-y-3 rounded-lg bg-gray-50 p-4">
-      <h3 className="font-bold text-gray-900">Add Delivery Agent</h3>
-
+    <form
+      onSubmit={handleSubmit}
+      className="grid gap-5 rounded-[28px] bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] ring-1 ring-slate-200 lg:grid-cols-[1fr_1.4fr_auto] lg:items-end"
+    >
       <div>
-        <label className="block text-sm font-medium text-gray-700">Name</label>
-        <input
-          type="text"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder="Agent Name"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          required
-        />
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fleet onboarding</p>
+        <h3 className="mt-2 text-xl font-black text-slate-950">Add delivery rider</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Register rider coordinates so dispatch can include them in assignment planning.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Latitude</label>
+      <div className="grid gap-4 md:grid-cols-3">
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">Rider name</span>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="Aarav Sharma"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            required
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">Latitude</span>
           <input
             type="number"
             name="lat"
             step="0.0001"
             value={formData.lat}
             onChange={handleChange}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             required
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Longitude</label>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">Longitude</span>
           <input
             type="number"
             name="lng"
             step="0.0001"
             value={formData.lng}
             onChange={handleChange}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             required
           />
-        </div>
+        </label>
       </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm font-medium text-rose-600 lg:col-span-3">{error}</p>}
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? "Creating..." : "Create Agent"}
       </button>

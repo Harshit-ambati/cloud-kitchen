@@ -1,6 +1,8 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import LocationPickerMap from "./LocationPickerMap";
 import { DELIVERY_AREAS, FALLBACK_MENU_ITEMS, MENU_IMAGE_MAP } from "../data/menu";
+import { ShoppingCart, Plus, Minus, Trash2, Coffee, IceCream, UtensilsCrossed, Pizza, Soup, ChefHat, Utensils } from "lucide-react";
 
 const API_URL = "http://localhost:8000/api";
 const KITCHEN_LOCATION = { lat: 17.385, lng: 78.4867 };
@@ -19,13 +21,26 @@ const INITIAL_CHECKOUT = {
   order_type: "regular",
 };
 
-const formatPrice = (value) => `Rs. ${value.toFixed(2)}`;
+const pageVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.08 },
+  },
+};
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.42, ease: "easeOut" } },
+};
+
+const spring = { type: "spring", stiffness: 280, damping: 24 };
+void motion;
+const formatPrice = (value) => `Rs. ${(value || 0).toFixed(2)}`;
 
 const inferDeliveryAreaByLocality = (locality) => {
   const normalizedLocality = locality.trim().toLowerCase();
-  if (!normalizedLocality) {
-    return DELIVERY_AREAS[0];
-  }
+  if (!normalizedLocality) return DELIVERY_AREAS[0];
 
   return (
     DELIVERY_AREAS.find((area) => {
@@ -36,9 +51,7 @@ const inferDeliveryAreaByLocality = (locality) => {
 };
 
 const inferDeliveryAreaByCoords = (lat, lng) => {
-  if (typeof lat !== "number" || typeof lng !== "number") {
-    return DELIVERY_AREAS[0];
-  }
+  if (typeof lat !== "number" || typeof lng !== "number") return DELIVERY_AREAS[0];
 
   return DELIVERY_AREAS.reduce((closest, candidate) => {
     const currentDistance = (closest.user_lat - lat) ** 2 + (closest.user_lng - lng) ** 2;
@@ -49,21 +62,585 @@ const inferDeliveryAreaByCoords = (lat, lng) => {
 
 const buildMenuCategories = (items) => {
   const seen = new Set();
-
   return items.reduce((categories, item) => {
     if (!seen.has(item.category)) {
       seen.add(item.category);
       categories.push(item.category);
     }
-
     return categories;
   }, []);
 };
+
+function Field({ label, children }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function MotionButton({ className = "", children, ...props }) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.95 }}
+      transition={spring}
+      className={className}
+      {...props}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+function Icon({ name, className = "h-4 w-4" }) {
+  if (name === "cart") return <ShoppingCart className={className} />;
+  if (name === "cart-plus") return <Plus className={className} />;
+  if (name === "minus") return <Minus className={className} />;
+  if (name === "plus") return <Plus className={className} />;
+  if (name === "trash") return <Trash2 className={className} />;
+  return null;
+}
+
+function Navbar({ itemCount, searchTerm, setSearchTerm, onCartClick }) {
+  return (
+    <motion.nav
+      variants={sectionVariants}
+      className="flex flex-col gap-4 rounded-3xl border border-white/70 bg-white/85 p-4 shadow-md backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between"
+    >
+      <div className="flex items-center gap-3">
+        <img src="/logo.png" alt="Cloud Kitchen logo" className="h-12 w-12 rounded-2xl object-cover shadow-md" />
+        <div>
+          <p className="font-semibold text-gray-900">Cloud Kitchen</p>
+          <p className="text-sm text-gray-500">Premium meals, live dispatch</p>
+        </div>
+      </div>
+
+      <div className="min-w-0 flex-1 lg:max-w-xl">
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Search biryani, rolls, ramen..."
+          className="w-full rounded-full border border-gray-200 bg-gray-100 px-5 py-3 text-sm text-gray-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-300"
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-3 lg:justify-end">
+        <MotionButton
+          type="button"
+          onClick={onCartClick}
+          aria-label={`Open cart with ${itemCount} item${itemCount === 1 ? "" : "s"}`}
+          className="relative inline-flex items-center gap-2 rounded-full bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700"
+        >
+          <Icon name="cart" />
+          <span>Cart</span>
+          <AnimatePresence>
+            {itemCount > 0 ? (
+              <motion.span
+                key={itemCount}
+                initial={{ scale: 0, y: 4 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0, y: 4 }}
+                className="absolute -right-2 -top-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold leading-none text-white"
+              >
+                {itemCount}
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
+        </MotionButton>
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-sm font-bold text-white shadow-md">
+          CK
+        </div>
+      </div>
+    </motion.nav>
+  );
+}
+
+function HeroSection({ featuredImage, selectedArea, isTakeaway, pickupReadyMinutes }) {
+  return (
+    <motion.section
+      variants={sectionVariants}
+      initial={{ opacity: 0, scale: 0.98, y: 22 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500 via-orange-400 to-red-500 p-6 text-white shadow-xl md:p-10"
+    >
+      <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+        <div>
+          <p className="mb-4 inline-flex rounded-full bg-white/20 px-4 py-2 text-sm font-semibold backdrop-blur">
+            {isTakeaway ? `Pickup in ${pickupReadyMinutes} min` : `Serving ${selectedArea.label}`}
+          </p>
+          <h1 className="max-w-2xl text-4xl font-semibold leading-tight text-white md:text-6xl">
+            Craving something delicious?
+          </h1>
+          <p className="mt-4 max-w-xl text-base text-white/85 md:text-lg">
+            Order chef-crafted meals with fast delivery, live ETA, and a smart kitchen workflow built for freshness.
+          </p>
+          <MotionButton
+            type="button"
+            onClick={() => document.getElementById("menu-grid")?.scrollIntoView({ behavior: "smooth" })}
+            className="mt-7 rounded-full bg-white px-6 py-3 text-sm font-bold text-orange-600 shadow-lg transition hover:shadow-xl"
+          >
+            Order Now
+          </MotionButton>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ ...spring, delay: 0.12 }}
+          className="relative min-h-64"
+        >
+          <div className="absolute inset-0 rounded-full bg-white/20 blur-3xl" />
+          <img
+            src={featuredImage}
+            alt="Featured food"
+            className="relative ml-auto aspect-square max-h-80 rounded-full object-cover shadow-2xl ring-8 ring-white/20"
+          />
+        </motion.div>
+      </div>
+    </motion.section>
+  );
+}
+
+function CategoryTabs({ categories, activeCategory, setActiveCategory }) {
+  const getCategoryIcon = (category) => {
+    switch (category.toLowerCase()) {
+      case "all": return <Utensils className="h-4 w-4 shrink-0" />;
+      case "bestsellers": return <ChefHat className="h-4 w-4 shrink-0" />;
+      case "biryani": return <UtensilsCrossed className="h-4 w-4 shrink-0" />;
+      case "rolls": return <Pizza className="h-4 w-4 shrink-0" />;
+      case "bowls": return <Soup className="h-4 w-4 shrink-0" />;
+      case "italian": return <Pizza className="h-4 w-4 shrink-0" />;
+      case "chinese": return <Utensils className="h-4 w-4 shrink-0" />;
+      case "korean": return <Utensils className="h-4 w-4 shrink-0" />;
+      case "ramen": return <Soup className="h-4 w-4 shrink-0" />;
+      case "beverages": return <Coffee className="h-4 w-4 shrink-0" />;
+      case "desserts": return <IceCream className="h-4 w-4 shrink-0" />;
+      case "north indian": return <UtensilsCrossed className="h-4 w-4 shrink-0" />;
+      case "breads": return <Utensils className="h-4 w-4 shrink-0" />;
+      default: return <Utensils className="h-4 w-4 shrink-0" />;
+    }
+  };
+
+  return (
+    <motion.div variants={sectionVariants} className="flex gap-3 overflow-x-auto pb-2">
+      {["All", ...categories].map((category) => (
+        <MotionButton
+          key={category}
+          type="button"
+          onClick={() => setActiveCategory(category)}
+          className={`shrink-0 flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold shadow-sm transition ${
+            activeCategory === category
+              ? "bg-orange-500 text-white shadow-lg shadow-orange-500/25"
+              : "bg-white text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+          }`}
+        >
+          {getCategoryIcon(category)}
+          {category}
+        </MotionButton>
+      ))}
+    </motion.div>
+  );
+}
+
+function FoodCard({ item, quantity, updateQuantity }) {
+  return (
+    <motion.article
+      layout
+      variants={sectionVariants}
+      whileHover={{ y: -6, scale: 1.015 }}
+      transition={spring}
+      className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-md transition-shadow hover:shadow-xl"
+    >
+      <div className="relative h-52 shrink-0 overflow-hidden">
+        <img src={item.image} alt={item.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/75 via-gray-900/10 to-transparent" />
+        <span className="absolute left-4 top-4 rounded-full bg-white/75 px-3 py-1 text-xs font-semibold text-yellow-700 shadow-sm backdrop-blur-xl">
+          {item.rating} star
+        </span>
+        <MotionButton
+          type="button"
+          aria-label={`Add ${item.name} to cart`}
+          onClick={() => updateQuantity(item.id, quantity + 1)}
+          className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-2xl font-semibold leading-none text-white shadow-lg"
+        >
+          <Icon name="cart-plus" className="h-5 w-5" />
+        </MotionButton>
+        <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
+          <div>
+            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.isVeg ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+              {item.isVeg ? "Veg" : "Non-Veg"}
+            </span>
+            <h3 className="mt-3 text-lg font-semibold text-white">{item.name}</h3>
+          </div>
+          <p className="rounded-full bg-white/85 px-3 py-1 text-sm font-bold text-orange-600 backdrop-blur">
+            Rs. {item.price}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4">
+        <p className="h-[4.5rem] overflow-hidden text-sm leading-6 text-gray-500">{item.description}</p>
+        <div className="mt-auto flex min-h-11 items-center justify-between gap-3 pt-4">
+          <p className="text-sm font-medium text-gray-500">{item.eta}</p>
+          {quantity === 0 ? (
+            <MotionButton
+              type="button"
+              onClick={() => updateQuantity(item.id, 1)}
+              className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-600"
+            >
+              <Icon name="cart-plus" />
+              <span>Add</span>
+            </MotionButton>
+          ) : (
+            <motion.div layout className="flex items-center gap-3 rounded-full bg-gray-800 px-3 py-2 text-white shadow-md">
+              <MotionButton
+                type="button"
+                aria-label={`Remove one ${item.name} from cart`}
+                onClick={() => updateQuantity(item.id, quantity - 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15"
+              >
+                <Icon name="minus" className="h-3.5 w-3.5" />
+              </MotionButton>
+              <span className="min-w-5 text-center text-sm font-bold">{quantity}</span>
+              <MotionButton
+                type="button"
+                aria-label={`Add one more ${item.name} to cart`}
+                onClick={() => updateQuantity(item.id, quantity + 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15"
+              >
+                <Icon name="plus" className="h-3.5 w-3.5" />
+              </MotionButton>
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <motion.div
+          key={`skeleton-${index}`}
+          variants={sectionVariants}
+          className="overflow-hidden rounded-2xl bg-white shadow-md"
+        >
+          <div className="h-52 animate-pulse bg-gray-200" />
+          <div className="space-y-4 p-4">
+            <div className="h-4 w-2/3 animate-pulse rounded-full bg-gray-200" />
+            <div className="h-3 w-full animate-pulse rounded-full bg-gray-200" />
+            <div className="h-3 w-4/5 animate-pulse rounded-full bg-gray-200" />
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function CartPanel({
+  cartItems,
+  itemCount,
+  subtotal,
+  deliveryFee,
+  platformFee,
+  taxes,
+  totalAmount,
+  checkout,
+  setCheckout,
+  handleCheckoutChange,
+  updateQuantity,
+  isTakeaway,
+  pickupReadyMinutes,
+  isReverseGeocoding,
+  isLocating,
+  useCurrentLocation,
+  isPickingLocation,
+  setIsPickingLocation,
+  handleLocationChange,
+  loading,
+  error,
+  handleSubmit,
+}) {
+  return (
+    <motion.aside
+      id="cart-panel"
+      tabIndex={-1}
+      initial={{ opacity: 0, x: 48 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ ...spring, delay: 0.18 }}
+      className="lg:sticky lg:top-6 lg:self-start"
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="overflow-hidden rounded-t-3xl border border-white/70 bg-white/75 shadow-xl backdrop-blur-xl lg:rounded-3xl"
+      >
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 text-white">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-orange-300">Order summary</p>
+              <h2 className="mt-1 text-lg font-semibold text-white">Your cart</h2>
+            </div>
+            <motion.div
+              key={itemCount}
+              initial={{ scale: 0.94 }}
+              animate={{ scale: 1 }}
+              transition={spring}
+              className="rounded-2xl bg-white/10 px-4 py-3 text-right"
+            >
+              <p className="text-xs text-gray-300">Total</p>
+              <p className="text-xl font-bold text-orange-400">{formatPrice(totalAmount)}</p>
+            </motion.div>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <AnimatePresence initial={false}>
+              {cartItems.length === 0 ? (
+                <motion.div
+                  key="empty-cart"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="rounded-2xl border border-dashed border-white/20 px-4 py-8 text-center"
+                >
+                  <p className="font-semibold text-white">Your cart is empty</p>
+                  <p className="mt-2 text-sm text-gray-300">Add a dish to start building your order.</p>
+                </motion.div>
+              ) : (
+                cartItems.map((item) => (
+                  <motion.div
+                    key={item.dish_id}
+                    layout
+                    initial={{ opacity: 0, x: 20, scale: 0.98 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 20, scale: 0.96 }}
+                    transition={spring}
+                    className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{item.name}</p>
+                      <p className="text-xs text-gray-300">
+                        {item.quantity} x Rs. {item.unit_price}
+                      </p>
+                    </div>
+                    <div className="ml-3 flex items-center gap-3">
+                      <p className="text-sm font-bold text-white">{formatPrice(item.line_total)}</p>
+                      <MotionButton
+                        type="button"
+                        onClick={() => updateQuantity(item.dish_id, 0)}
+                        aria-label={`Remove ${item.name} from cart`}
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-orange-300 transition hover:bg-red-500/20 hover:text-red-400"
+                      >
+                        <Icon name="trash" className="h-4 w-4" />
+                      </MotionButton>
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        <div className="max-h-[62vh] space-y-5 overflow-y-auto p-6 lg:max-h-none">
+          <div className="space-y-3 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
+            <div className="flex justify-between">
+              <span>Item total</span>
+              <span className="font-semibold">{formatPrice(subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Delivery fee</span>
+              <span className="font-semibold">{formatPrice(deliveryFee)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Platform fee</span>
+              <span className="font-semibold">{formatPrice(platformFee)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>GST</span>
+              <span className="font-semibold">{formatPrice(taxes)}</span>
+            </div>
+            <div className="flex justify-between border-t border-gray-200 pt-3 text-base font-bold text-gray-900">
+              <span>To pay</span>
+              <span className="text-orange-500">{formatPrice(totalAmount)}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { id: "delivery", label: "Delivery" },
+              { id: "takeaway", label: "Takeaway" },
+            ].map((option) => (
+              <MotionButton
+                key={option.id}
+                type="button"
+                onClick={() => setCheckout((current) => ({ ...current, fulfillment_mode: option.id }))}
+                className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                  checkout.fulfillment_mode === option.id
+                    ? "border-orange-500 bg-orange-500 text-white"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-orange-300"
+                }`}
+              >
+                {option.label}
+              </MotionButton>
+            ))}
+          </div>
+
+          <div className="grid gap-3">
+            <Field label="Customer name">
+              <input
+                type="text"
+                name="customer_name"
+                value={checkout.customer_name}
+                onChange={handleCheckoutChange}
+                placeholder="Enter customer name"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </Field>
+            <Field label="Phone number">
+              <input
+                type="text"
+                name="customer_phone"
+                value={checkout.customer_phone}
+                onChange={handleCheckoutChange}
+                placeholder="98xxxxxx12"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </Field>
+
+            {!isTakeaway ? (
+              <>
+                <Field label="Locality / area">
+                  <input
+                    type="text"
+                    name="locality"
+                    value={checkout.locality}
+                    onChange={handleCheckoutChange}
+                    placeholder="Banjara Hills, Jubilee Hills..."
+                    className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </Field>
+                <div className="rounded-2xl bg-gray-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Delivery pin</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {isReverseGeocoding ? "Auto-filling address..." : `Lat ${checkout.user_lat.toFixed(4)}, Lng ${checkout.user_lng.toFixed(4)}`}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <MotionButton type="button" onClick={useCurrentLocation} disabled={isLocating} className="rounded-full bg-gray-900 px-3 py-2 text-xs font-bold text-white">
+                        {isLocating ? "Locating" : "Use GPS"}
+                      </MotionButton>
+                      <MotionButton type="button" onClick={() => setIsPickingLocation((current) => !current)} className="rounded-full border border-gray-300 px-3 py-2 text-xs font-bold text-gray-700">
+                        {isPickingLocation ? "Hide" : "Map"}
+                      </MotionButton>
+                    </div>
+                  </div>
+                  <AnimatePresence>
+                    {isPickingLocation ? (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 overflow-hidden"
+                      >
+                        <LocationPickerMap position={{ lat: checkout.user_lat, lng: checkout.user_lng }} onChange={handleLocationChange} />
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+                <Field label="Full address">
+                  <textarea
+                    name="street_address"
+                    value={checkout.street_address}
+                    onChange={handleCheckoutChange}
+                    placeholder="Flat no, building, street name"
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Landmark">
+                    <input
+                      type="text"
+                      name="landmark"
+                      value={checkout.landmark}
+                      onChange={handleCheckoutChange}
+                      placeholder="Near..."
+                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                  </Field>
+                  <Field label="Pincode">
+                    <input
+                      type="text"
+                      name="pincode"
+                      value={checkout.pincode}
+                      onChange={handleCheckoutChange}
+                      placeholder="500081"
+                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                  </Field>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-2xl bg-orange-50 p-4 text-sm text-gray-700">
+                Pickup from Cloud Kitchen Express. Ready in about {pickupReadyMinutes} minutes.
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Speed">
+                <select
+                  name="order_type"
+                  value={checkout.order_type}
+                  onChange={handleCheckoutChange}
+                  className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                >
+                  <option value="regular">Regular</option>
+                  <option value="express">Express</option>
+                  <option value="veg">Veg Priority</option>
+                </select>
+              </Field>
+              <Field label="Priority">
+                <select
+                  name="priority"
+                  value={checkout.priority}
+                  onChange={handleCheckoutChange}
+                  className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                >
+                  <option value="standard">Standard</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Rush</option>
+                </select>
+              </Field>
+            </div>
+          </div>
+
+          {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
+
+          <MotionButton
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 px-5 py-4 text-sm font-bold text-white shadow-lg hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Placing order..." : "Checkout now"}
+          </MotionButton>
+        </div>
+      </form>
+    </motion.aside>
+  );
+}
 
 export default function OrderForm({ onOrderCreated, onTrackOrder }) {
   const [activeCategory, setActiveCategory] = useState("All");
   const [dietFilter, setDietFilter] = useState("all");
   const [sortBy, setSortBy] = useState("popular");
+  const [searchTerm, setSearchTerm] = useState("");
   const [menuItems, setMenuItems] = useState([]);
   const [menuCategories, setMenuCategories] = useState([]);
   const [menuLoading, setMenuLoading] = useState(true);
@@ -72,6 +649,7 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successOrder, setSuccessOrder] = useState(null);
+  const [toastMessage, setToastMessage] = useState("");
   const [isPickingLocation, setIsPickingLocation] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
@@ -81,9 +659,7 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
       setMenuLoading(true);
       try {
         const res = await fetch(`${API_URL}/menu/`);
-        if (!res.ok) {
-          throw new Error("Failed to load menu");
-        }
+        if (!res.ok) throw new Error("Failed to load menu");
 
         const data = await res.json();
         const fetchedMenuItems = (data.items || []).map((item) => ({
@@ -106,75 +682,61 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
   }, []);
 
   useEffect(() => {
-    if (activeCategory === "All") {
-      return;
-    }
-
-    if (!menuCategories.includes(activeCategory)) {
+    if (activeCategory !== "All" && !menuCategories.includes(activeCategory)) {
       setActiveCategory("All");
     }
   }, [activeCategory, menuCategories]);
 
-  const selectedArea = useMemo(
-    () => {
-      if (checkout.locality.trim()) {
-        return inferDeliveryAreaByLocality(checkout.locality);
-      }
+  useEffect(() => {
+    if (!toastMessage) return undefined;
+    const timeout = window.setTimeout(() => setToastMessage(""), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [toastMessage]);
 
-      return inferDeliveryAreaByCoords(checkout.user_lat, checkout.user_lng);
-    },
-    [checkout.locality, checkout.user_lat, checkout.user_lng],
-  );
+  const selectedArea = useMemo(() => {
+    if (checkout.locality.trim()) return inferDeliveryAreaByLocality(checkout.locality);
+    return inferDeliveryAreaByCoords(checkout.user_lat, checkout.user_lng);
+  }, [checkout.locality, checkout.user_lat, checkout.user_lng]);
 
-  const visibleMenu = useMemo(
-    () => {
-      const filtered = menuItems.filter((item) => {
-        const matchesCategory =
-          activeCategory === "All"
-            ? true
-            : item.category === activeCategory || (activeCategory === "Bestsellers" && item.category === "Bestsellers");
-        const matchesDiet =
-          dietFilter === "all"
-            ? true
-            : dietFilter === "veg"
-              ? item.isVeg
-              : !item.isVeg;
+  const visibleMenu = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const filtered = menuItems.filter((item) => {
+      const matchesCategory = activeCategory === "All" || item.category === activeCategory;
+      const matchesDiet = dietFilter === "all" ? true : dietFilter === "veg" ? item.isVeg : !item.isVeg;
+      const matchesSearch =
+        !normalizedSearch ||
+        item.name.toLowerCase().includes(normalizedSearch) ||
+        item.description.toLowerCase().includes(normalizedSearch) ||
+        item.category.toLowerCase().includes(normalizedSearch);
 
-        return matchesCategory && matchesDiet;
-      });
+      return matchesCategory && matchesDiet && matchesSearch;
+    });
 
-      const sorted = [...filtered];
-      switch (sortBy) {
-        case "price-low":
-          sorted.sort((left, right) => left.price - right.price);
-          break;
-        case "price-high":
-          sorted.sort((left, right) => right.price - left.price);
-          break;
-        case "rating":
-          sorted.sort((left, right) => right.rating - left.rating);
-          break;
-        case "eta":
-          sorted.sort((left, right) => parseInt(left.eta, 10) - parseInt(right.eta, 10));
-          break;
-        default:
-          sorted.sort((left, right) => right.rating - left.rating);
-          break;
-      }
+    const sorted = [...filtered];
+    switch (sortBy) {
+      case "price-low":
+        sorted.sort((left, right) => left.price - right.price);
+        break;
+      case "price-high":
+        sorted.sort((left, right) => right.price - left.price);
+        break;
+      case "eta":
+        sorted.sort((left, right) => parseInt(left.eta, 10) - parseInt(right.eta, 10));
+        break;
+      default:
+        sorted.sort((left, right) => right.rating - left.rating);
+        break;
+    }
 
-      return sorted;
-    },
-    [activeCategory, dietFilter, menuItems, sortBy],
-  );
+    return sorted;
+  }, [activeCategory, dietFilter, menuItems, searchTerm, sortBy]);
 
   const cartItems = useMemo(
     () =>
       Object.entries(cart)
         .map(([itemId, quantity]) => {
           const menuItem = menuItems.find((item) => item.id === itemId);
-          if (!menuItem || quantity <= 0) {
-            return null;
-          }
+          if (!menuItem || quantity <= 0) return null;
 
           return {
             dish_id: menuItem.id,
@@ -199,33 +761,35 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
   const pickupReadyMinutes = 18 + (checkout.order_type === "express" ? -6 : 0) + Math.min(cartItems.length * 2, 10);
 
   const updateQuantity = (itemId, nextQuantity) => {
-    if (successOrder) {
-      setSuccessOrder(null);
-    }
+    if (successOrder) setSuccessOrder(null);
+    setError("");
 
     setCart((current) => {
+      const currentQuantity = current[itemId] || 0;
       if (nextQuantity <= 0) {
         const updated = { ...current };
         delete updated[itemId];
         return updated;
       }
 
-      return {
-        ...current,
-        [itemId]: nextQuantity,
-      };
+      if (nextQuantity > currentQuantity) {
+        const menuItem = menuItems.find((item) => item.id === itemId);
+        setToastMessage(`${menuItem?.name || "Item"} added`);
+      }
+
+      return { ...current, [itemId]: nextQuantity };
     });
   };
 
   const handleCheckoutChange = ({ target: { name, value } }) => {
-    if (successOrder) {
-      setSuccessOrder(null);
-    }
+    if (successOrder) setSuccessOrder(null);
+    setCheckout((current) => ({ ...current, [name]: value }));
+  };
 
-    setCheckout((current) => ({
-      ...current,
-      [name]: value,
-    }));
+  const handleCartClick = () => {
+    const cartPanel = document.getElementById("cart-panel");
+    cartPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
+    cartPanel?.focus({ preventScroll: true });
   };
 
   const reverseGeocodeLocation = async ({ lat, lng }) => {
@@ -233,16 +797,9 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`,
-        {
-          headers: {
-            "Accept-Language": "en",
-          },
-        },
+        { headers: { "Accept-Language": "en" } },
       );
-
-      if (!response.ok) {
-        throw new Error("Reverse geocoding request failed");
-      }
+      if (!response.ok) throw new Error("Reverse geocoding request failed");
 
       const data = await response.json();
       const address = data.address || {};
@@ -255,18 +812,12 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
         address.village ||
         inferDeliveryAreaByCoords(lat, lng).label;
       const streetAddress = [address.house_number, address.road].filter(Boolean).join(", ");
-      const landmark =
-        address.building ||
-        address.amenity ||
-        address.shop ||
-        address.office ||
-        "";
 
       setCheckout((current) => ({
         ...current,
         locality,
         street_address: streetAddress || current.street_address,
-        landmark: landmark || current.landmark,
+        landmark: address.building || address.amenity || address.shop || address.office || current.landmark,
         pincode: address.postcode || current.pincode,
       }));
     } catch {
@@ -298,10 +849,7 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
     setError("");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        handleLocationChange({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
+        handleLocationChange({ lat: position.coords.latitude, lng: position.coords.longitude });
         setIsLocating(false);
         setIsPickingLocation(true);
       },
@@ -366,10 +914,7 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (!res.ok) {
-        throw new Error("Failed to create order");
-      }
+      if (!res.ok) throw new Error("Failed to create order");
 
       const data = await res.json();
       onOrderCreated(data);
@@ -384,132 +929,86 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
   };
 
   return (
-    <section className="space-y-6">
+    <motion.section
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="mx-auto max-w-7xl space-y-8 pb-28 lg:pb-0"
+    >
+      <AnimatePresence>
+        {toastMessage ? (
+          <motion.div
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            className="fixed right-5 top-5 z-50 rounded-2xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-xl"
+          >
+            {toastMessage}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <Navbar
+        itemCount={itemCount}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        onCartClick={handleCartClick}
+      />
+      <HeroSection
+        featuredImage={menuItems[0]?.image || FALLBACK_MENU_ITEMS[0].image}
+        selectedArea={selectedArea}
+        isTakeaway={isTakeaway}
+        pickupReadyMinutes={pickupReadyMinutes}
+      />
+
       {successOrder ? (
-        <div className="overflow-hidden rounded-[30px] bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_45%,#ecfeff_100%)] p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-orange-100">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-orange-600">Order confirmed</p>
-              <h3 className="mt-2 text-3xl font-black text-slate-950">
-                Order #{successOrder.id.slice(-6)} was placed successfully.
-              </h3>
-              <p className="mt-3 text-sm text-slate-600">
+        <motion.section variants={sectionVariants} className="rounded-3xl border border-orange-100 bg-white p-6 shadow-xl">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-orange-500">Order confirmed</p>
+              <h2 className="mt-2 text-2xl font-semibold text-gray-900">Order #{successOrder.id.slice(-6)} is live.</h2>
+              <p className="mt-2 text-sm text-gray-500">
                 {successOrder.fulfillment_mode === "takeaway"
-                  ? `Pickup is expected around ${new Date(successOrder.pickup_ready_at).toLocaleString()}. We will move it to ready for pickup once the kitchen finishes.`
-                  : `Your order is now in the live queue for ${successOrder.delivery_area || "your location"}, with an ETA of about ${successOrder.predicted_eta_minutes} minutes.`}
+                  ? `Pickup is expected around ${new Date(successOrder.pickup_ready_at).toLocaleString()}.`
+                  : `ETA is about ${successOrder.predicted_eta_minutes} minutes for ${successOrder.delivery_area || "your location"}.`}
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(successOrder.items || []).map((item) => (
-                  <span
-                    key={`success-${successOrder.id}-${item.dish_id}`}
-                    className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200"
-                  >
-                    {item.name} x{item.quantity}
-                  </span>
-                ))}
-              </div>
             </div>
-
-            <div className="rounded-[24px] bg-slate-950 px-5 py-5 text-white lg:min-w-72">
-              <p className="text-xs uppercase tracking-[0.2em] text-orange-200">Bill summary</p>
-              <p className="mt-2 text-3xl font-black">{formatPrice(successOrder.total_amount || 0)}</p>
-              <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-slate-300">
-                <p>
-                  Items
-                  <span className="mt-1 block font-semibold text-white">{successOrder.item_count || 0}</span>
-                </p>
-                <p>
-                  Mode
-                  <span className="mt-1 block font-semibold capitalize text-white">{successOrder.fulfillment_mode}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
+            <MotionButton
               type="button"
               onClick={() => onTrackOrder(successOrder.id)}
               className="rounded-full bg-orange-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-600"
             >
               Track order
-            </button>
-            <button
-              type="button"
-              onClick={() => setSuccessOrder(null)}
-              className="rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-orange-300 hover:text-orange-600"
-            >
-              Continue browsing
-            </button>
+            </MotionButton>
           </div>
-        </div>
+        </motion.section>
       ) : null}
 
-      <div className="overflow-hidden rounded-[32px] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)] ring-1 ring-orange-100">
-        <div className="bg-[radial-gradient(circle_at_top_left,_rgba(251,146,60,0.25),_transparent_32%),linear-gradient(135deg,#fff7ed_0%,#ffffff_45%,#fef2f2_100%)] px-6 py-8 md:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <span className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-orange-600 ring-1 ring-orange-200">
-                Swiggy / Zomato style ordering
-              </span>
-              <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
-                Discover dishes, compare prices, and place orders in one flow.
-              </h2>
-              <p className="mt-3 max-w-xl text-sm text-slate-600 md:text-base">
-                This version keeps your ETA and rider assignment engine, but the top experience now behaves like a proper food delivery app.
+      <CategoryTabs categories={menuCategories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} />
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <motion.main id="menu-grid" variants={sectionVariants} className="space-y-6">
+          <div className="flex flex-col gap-4 rounded-3xl bg-white p-4 shadow-md md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{activeCategory} dishes</h2>
+              <p className="text-sm text-gray-500">
+                {menuLoading ? "Loading menu..." : `${visibleMenu.length} dishes available now`}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm text-slate-700">
-              <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-orange-100 backdrop-blur">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live Menu</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{menuItems.length}</p>
-                <p>Dishes available now</p>
-              </div>
-              <div className="rounded-2xl bg-slate-900 p-4 text-white shadow-lg">
-                <p className="text-xs uppercase tracking-[0.2em] text-orange-200">{isTakeaway ? "Pickup Promise" : "Fast Delivery"}</p>
-                <p className="mt-2 text-2xl font-bold">{isTakeaway ? `${pickupReadyMinutes} min` : `${selectedArea.deliveryFee} Rs`}</p>
-                <p className="text-slate-300">{isTakeaway ? "Estimated collection time" : `Fee for ${selectedArea.label}`}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            {["All", ...menuCategories].map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setActiveCategory(category)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  activeCategory === category
-                    ? "bg-slate-900 text-white shadow-lg"
-                    : "bg-white/80 text-slate-700 ring-1 ring-slate-200 hover:bg-white"
-                }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-6 grid gap-3 lg:grid-cols-2">
-            <label className="rounded-2xl bg-white/85 px-4 py-3 ring-1 ring-slate-200">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Food type</span>
+            <div className="grid gap-3 sm:grid-cols-2">
               <select
                 value={dietFilter}
                 onChange={(event) => setDietFilter(event.target.value)}
-                className="w-full bg-transparent text-sm text-slate-800 outline-none"
+                className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-orange-400"
               >
-                <option value="all">All</option>
+                <option value="all">All food</option>
                 <option value="veg">Veg only</option>
                 <option value="non-veg">Non-veg only</option>
               </select>
-            </label>
-
-            <label className="rounded-2xl bg-white/85 px-4 py-3 ring-1 ring-slate-200">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sort by</span>
               <select
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value)}
-                className="w-full bg-transparent text-sm text-slate-800 outline-none"
+                className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-orange-400"
               >
                 <option value="popular">Popular</option>
                 <option value="rating">Rating</option>
@@ -517,411 +1016,57 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
                 <option value="price-high">Price: High to Low</option>
                 <option value="eta">Faster delivery</option>
               </select>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.55fr_0.95fr]">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-2xl font-black text-slate-900">{activeCategory}</h3>
-              <p className="text-sm text-slate-500">
-                {menuLoading ? "Loading menu..." : `${visibleMenu.length} matching dishes with visible pricing and quick add controls.`}
-              </p>
-            </div>
-            <div className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200">
-              {itemCount} item{itemCount === 1 ? "" : "s"} in cart
             </div>
           </div>
 
           {menuLoading ? (
-            <div className="rounded-[28px] border border-dashed border-slate-200 bg-white px-6 py-12 text-center shadow-[0_18px_50px_rgba(15,23,42,0.04)]">
-              <p className="text-lg font-semibold text-slate-800">Loading the live menu</p>
-              <p className="mt-2 text-sm text-slate-500">Fetching dishes and pricing from the restaurant catalog.</p>
-            </div>
+            <LoadingSkeleton />
           ) : visibleMenu.length === 0 ? (
-            <div className="rounded-[28px] border border-dashed border-slate-200 bg-white px-6 py-12 text-center shadow-[0_18px_50px_rgba(15,23,42,0.04)]">
-              <p className="text-lg font-semibold text-slate-800">No dishes matched these filters</p>
-              <p className="mt-2 text-sm text-slate-500">Try a different cuisine or switch the veg filter.</p>
-            </div>
+            <motion.div variants={sectionVariants} className="rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center shadow-md">
+              <p className="text-lg font-semibold text-gray-900">No dishes matched</p>
+              <p className="mt-2 text-sm text-gray-500">Try another search, cuisine, or food type.</p>
+            </motion.div>
           ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {visibleMenu.map((item) => {
-              const quantity = cart[item.id] || 0;
-
-              return (
-                <article
-                  key={item.id}
-                  className="overflow-hidden rounded-[28px] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)] ring-1 ring-slate-200"
-                >
-                  <div className="relative h-48 overflow-hidden">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-full w-full object-cover transition duration-500 hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-slate-900/10 to-transparent" />
-                    <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5">
-                      <span className="rounded-full bg-white/85 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-slate-700">
-                        {item.isVeg ? "Veg" : "Non-Veg"}
-                      </span>
-                      <span className="rounded-full bg-slate-900/80 px-3 py-1 text-xs font-semibold text-white">
-                        {item.rating} star
-                      </span>
-                    </div>
-                    <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-orange-200">{item.category}</p>
-                      <div className="mt-2 flex items-end justify-between gap-4">
-                        <div>
-                          <h4 className="text-2xl font-black leading-tight">{item.name}</h4>
-                          <p className="mt-1 text-sm text-white/85">{item.eta}</p>
-                        </div>
-                        <p className="text-xl font-black">Rs. {item.price}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 p-5">
-                    <div>
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Popular pick</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-500">Category: {item.category}</p>
-
-                      {quantity === 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => updateQuantity(item.id, 1)}
-                          className="rounded-full bg-orange-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-600"
-                        >
-                          Add
-                        </button>
-                      ) : (
-                        <div className="inline-flex items-center gap-3 rounded-full bg-slate-900 px-3 py-2 text-white">
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(item.id, quantity - 1)}
-                            className="h-7 w-7 rounded-full bg-white/15 text-lg leading-none"
-                          >
-                            -
-                          </button>
-                          <span className="min-w-5 text-center text-sm font-bold">{quantity}</span>
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(item.id, quantity + 1)}
-                            className="h-7 w-7 rounded-full bg-white/15 text-lg leading-none"
-                          >
-                            +
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+            <motion.div layout className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <AnimatePresence mode="popLayout">
+                {visibleMenu.map((item) => (
+                  <FoodCard
+                    key={item.id}
+                    item={item}
+                    quantity={cart[item.id] || 0}
+                    updateQuantity={updateQuantity}
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
           )}
-        </div>
+        </motion.main>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="rounded-[30px] bg-slate-950 p-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-orange-200">Checkout</p>
-                <h3 className="mt-2 text-3xl font-black">Your cart</h3>
-              </div>
-              <div className="rounded-2xl bg-white/10 px-4 py-3 text-right">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Grand Total</p>
-                <p className="mt-1 text-2xl font-black">{formatPrice(totalAmount)}</p>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-3">
-              {cartItems.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/20 px-4 py-8 text-center text-sm text-slate-300">
-                  Add dishes from the menu to build a real itemized order.
-                </div>
-              ) : (
-                cartItems.map((item) => (
-                  <div key={item.dish_id} className="flex items-center justify-between rounded-2xl bg-white/8 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold">{item.name}</p>
-                      <p className="text-sm text-slate-300">
-                        {item.quantity} x Rs. {item.unit_price}
-                      </p>
-                    </div>
-                    <div className="ml-4 flex items-center gap-3">
-                      <p className="font-bold">{formatPrice(item.line_total)}</p>
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(item.dish_id, 0)}
-                        aria-label={`Remove ${item.name} from cart`}
-                        title="Remove from cart"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-rose-200 transition hover:border-rose-300 hover:text-white"
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-none stroke-current stroke-2">
-                          <path d="M4 7h16" />
-                          <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                          <path d="M7 7l1 12a1 1 0 0 0 1 .9h6a1 1 0 0 0 1-.9L17 7" />
-                          <path d="M10 11v5" />
-                          <path d="M14 11v5" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-      <div className="mt-6 space-y-3 rounded-[24px] bg-white px-5 py-4 text-sm text-slate-700">
-              <div className="flex items-center justify-between">
-                <span>Item total</span>
-                <span className="font-semibold">{formatPrice(subtotal)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Delivery fee</span>
-                <span className="font-semibold">{formatPrice(deliveryFee)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Platform fee</span>
-                <span className="font-semibold">{formatPrice(platformFee)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>GST & restaurant charges (5%)</span>
-                <span className="font-semibold">{formatPrice(taxes)}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-950">
-                <span>To pay</span>
-                <span>{formatPrice(totalAmount)}</span>
-              </div>
-              {isTakeaway ? (
-                <p className="text-xs text-slate-500">
-                  Pickup ready in about {pickupReadyMinutes} minutes after the kitchen starts preparing your order.
-                </p>
-              ) : (
-                <p className="text-xs text-slate-500">
-                  Delivery ETA is based on the map pin and nearest service zone around {selectedArea.label}.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-[30px] bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] ring-1 ring-slate-200">
-            <h3 className="text-xl font-black text-slate-900">Order details</h3>
-            <div className="mt-5 grid gap-4">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Fulfillment mode</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: "delivery", label: "Delivery", note: "Doorstep order with rider ETA" },
-                    { id: "takeaway", label: "Takeaway", note: "Pick up from the restaurant" },
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() =>
-                        setCheckout((current) => ({
-                          ...current,
-                          fulfillment_mode: option.id,
-                        }))
-                      }
-                      className={`rounded-2xl border px-4 py-4 text-left transition ${
-                        checkout.fulfillment_mode === option.id
-                          ? "border-orange-400 bg-orange-50 ring-2 ring-orange-100"
-                          : "border-slate-200 bg-white hover:border-orange-200"
-                      }`}
-                    >
-                      <p className="text-sm font-bold text-slate-900">{option.label}</p>
-                      <p className="mt-1 text-xs text-slate-500">{option.note}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Customer name</label>
-                <input
-                  type="text"
-                  name="customer_name"
-                  value={checkout.customer_name}
-                  onChange={handleCheckoutChange}
-                  placeholder="Enter customer name"
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Phone number</label>
-                <input
-                  type="text"
-                  name="customer_phone"
-                  value={checkout.customer_phone}
-                  onChange={handleCheckoutChange}
-                  placeholder="98xxxxxx12"
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                />
-              </div>
-
-              {isTakeaway ? (
-                <div className="rounded-2xl bg-orange-50 px-4 py-4 ring-1 ring-orange-100">
-                  <p className="text-sm font-semibold text-slate-900">Pickup from Cloud Kitchen Express</p>
-                  <p className="mt-1 text-sm text-slate-600">Hyderabad kitchen</p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    Your order will be prepared first, then shown as ready for pickup with a collection time.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">Locality / area</label>
-                    <input
-                      type="text"
-                      name="locality"
-                      value={checkout.locality}
-                      onChange={handleCheckoutChange}
-                      placeholder="Banjara Hills, Jubilee Hills, Gachibowli..."
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                    />
-                    <p className="mt-2 text-xs text-slate-500">
-                      Delivery fee and ETA are estimated using the nearest service zone. Current match: {selectedArea.label}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 px-4 py-4 ring-1 ring-slate-200">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">Delivery pin</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Lat {checkout.user_lat.toFixed(4)}, Lng {checkout.user_lng.toFixed(4)}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {isReverseGeocoding ? "Auto-filling address from selected pin..." : "Address fields can auto-fill from your pin."}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={useCurrentLocation}
-                          disabled={isLocating}
-                          className="rounded-full bg-slate-900 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-white transition hover:bg-slate-800 disabled:opacity-60"
-                        >
-                          {isLocating ? "Locating..." : "Use Current Location"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsPickingLocation((current) => !current)}
-                          className="rounded-full border border-slate-300 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-700 transition hover:border-orange-300 hover:text-orange-600"
-                        >
-                          {isPickingLocation ? "Hide Map" : "Pick on Map"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {isPickingLocation ? (
-                      <div className="mt-4 space-y-3">
-                        <LocationPickerMap
-                          position={{ lat: checkout.user_lat, lng: checkout.user_lng }}
-                          onChange={handleLocationChange}
-                        />
-                        <p className="text-xs text-slate-500">
-                          Click anywhere on the map or drag the marker to set the exact delivery spot.
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">Flat / house / street address</label>
-                    <textarea
-                      name="street_address"
-                      value={checkout.street_address}
-                      onChange={handleCheckoutChange}
-                      placeholder="Flat no, building, street name"
-                      rows={3}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                    />
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-slate-700">Landmark</label>
-                      <input
-                        type="text"
-                        name="landmark"
-                        value={checkout.landmark}
-                        onChange={handleCheckoutChange}
-                        placeholder="Nearby store, apartment gate, metro..."
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-slate-700">Pincode</label>
-                      <input
-                        type="text"
-                        name="pincode"
-                        value={checkout.pincode}
-                        onChange={handleCheckoutChange}
-                        placeholder="500081"
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Delivery speed</label>
-                  <select
-                    name="order_type"
-                    value={checkout.order_type}
-                    onChange={handleCheckoutChange}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                  >
-                    <option value="regular">Regular</option>
-                    <option value="express">Express</option>
-                    <option value="veg">Veg Priority</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Kitchen priority</label>
-                  <select
-                    name="priority"
-                    value={checkout.priority}
-                    onChange={handleCheckoutChange}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                  >
-                    <option value="standard">Standard</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Rush</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {error ? <p className="mt-4 text-sm font-medium text-rose-500">{error}</p> : null}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-6 w-full rounded-2xl bg-orange-500 px-5 py-4 text-sm font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? "Placing order..." : `Place order for ${formatPrice(totalAmount)}`}
-            </button>
-          </div>
-        </form>
+        <CartPanel
+          cartItems={cartItems}
+          itemCount={itemCount}
+          subtotal={subtotal}
+          deliveryFee={deliveryFee}
+          platformFee={platformFee}
+          taxes={taxes}
+          totalAmount={totalAmount}
+          checkout={checkout}
+          setCheckout={setCheckout}
+          handleCheckoutChange={handleCheckoutChange}
+          updateQuantity={updateQuantity}
+          isTakeaway={isTakeaway}
+          pickupReadyMinutes={pickupReadyMinutes}
+          isReverseGeocoding={isReverseGeocoding}
+          isLocating={isLocating}
+          useCurrentLocation={useCurrentLocation}
+          isPickingLocation={isPickingLocation}
+          setIsPickingLocation={setIsPickingLocation}
+          handleLocationChange={handleLocationChange}
+          loading={loading}
+          error={error}
+          handleSubmit={handleSubmit}
+        />
       </div>
-    </section>
+    </motion.section>
   );
 }

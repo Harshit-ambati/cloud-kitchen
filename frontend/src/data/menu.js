@@ -14,6 +14,16 @@ import koreanFriedChickenImage from "../assets/menu/korean-fried-chicken.jpg";
 import spicyMisoRamenImage from "../assets/menu/spicy-miso-ramen.jpg";
 import vegHakkaNoodlesImage from "../assets/menu/veg-hakka-noodles.jpg";
 import vegKoreanRamenImage from "../assets/menu/veg-korean-ramen.jpg";
+import mangoLassiImage from "../assets/menu/mango-lassi.png";
+import classicMojitoImage from "../assets/menu/classic-mojito.png";
+import chocolateLavaCakeImage from "../assets/menu/chocolate-lava-cake.png";
+import rasmalaiImage from "../assets/menu/rasmalai.png";
+import icedPeachTeaImage from "../assets/menu/iced-peach-tea.png";
+import masalaChaiImage from "../assets/menu/masala-chai.png";
+import strawberryMilkshakeImage from "../assets/menu/strawberry-milkshake.png";
+import chickenTikkaMasalaImage from "../assets/menu/chicken-tikka-masala.png";
+import muttonRoganJoshImage from "../assets/menu/mutton-rogan-josh.png";
+import garlicNaanImage from "../assets/menu/garlic-naan.png";
 
 export const MENU_IMAGE_MAP = {
   "butter-chicken-bowl": butterChickenBowlImage,
@@ -32,6 +42,16 @@ export const MENU_IMAGE_MAP = {
   "spicy-miso-ramen": spicyMisoRamenImage,
   "veg-korean-ramen": vegKoreanRamenImage,
   "cold-coffee": coldCoffeeImage,
+  "mango-lassi": mangoLassiImage,
+  "classic-mojito": classicMojitoImage,
+  "chocolate-lava-cake": chocolateLavaCakeImage,
+  "rasmalai": rasmalaiImage,
+  "iced-peach-tea": icedPeachTeaImage,
+  "masala-chai": masalaChaiImage,
+  "strawberry-milkshake": strawberryMilkshakeImage,
+  "chicken-tikka-masala": chickenTikkaMasalaImage,
+  "mutton-rogan-josh": muttonRoganJoshImage,
+  "garlic-naan": garlicNaanImage,
 };
 
 export const FALLBACK_MENU_ITEMS = [

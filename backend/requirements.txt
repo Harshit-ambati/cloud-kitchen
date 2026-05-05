@@ -8,3 +8,5 @@ ortools
 pydantic-settings
 pandas
 numpy
+PyJWT
+bcrypt
