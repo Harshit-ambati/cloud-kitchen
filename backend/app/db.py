@@ -1,3 +1,9 @@
+"""
+Database Configuration
+------------------------
+MongoDB connection and collection references.
+"""
+
 from pymongo import MongoClient
 import os
 from pathlib import Path
@@ -15,6 +21,9 @@ client = MongoClient(
 )
 db = client["cloud_kitchen"]
 
+# ── Collection references ─────────────────────────────────────────────
 orders = db["orders"]
 agents = db["agents"]
 menu_items = db["menu_items"]
+users = db["users"]
+branches = db["branches"]

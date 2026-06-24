@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import LocationPickerMap from "./LocationPickerMap";
 import { DELIVERY_AREAS, FALLBACK_MENU_ITEMS, MENU_IMAGE_MAP } from "../data/menu";
 import { ShoppingCart, Plus, Minus, Trash2, Coffee, IceCream, UtensilsCrossed, Pizza, Soup, ChefHat, Utensils } from "lucide-react";
+import { API_URL } from "../config/api";
 
-const API_URL = "http://localhost:8000/api";
 const KITCHEN_LOCATION = { lat: 17.385, lng: 78.4867 };
+const CART_STORAGE_KEY = "ck_cart";
 
 const INITIAL_CHECKOUT = {
   customer_name: "",
@@ -103,7 +104,9 @@ function Icon({ name, className = "h-4 w-4" }) {
   return null;
 }
 
-function Navbar({ itemCount, searchTerm, setSearchTerm, onCartClick }) {
+function Navbar({ itemCount, searchTerm, setSearchTerm, onCartClick, currentUser, onProfileClick, onLoginRequired }) {
+  const isCustomer = currentUser?.role === "customer";
+
   return (
     <motion.nav
       variants={sectionVariants}
@@ -130,7 +133,7 @@ function Navbar({ itemCount, searchTerm, setSearchTerm, onCartClick }) {
       <div className="flex items-center justify-between gap-3 lg:justify-end">
         <MotionButton
           type="button"
-          onClick={onCartClick}
+          onClick={isCustomer ? onCartClick : onLoginRequired}
           aria-label={`Open cart with ${itemCount} item${itemCount === 1 ? "" : "s"}`}
           className="relative inline-flex items-center gap-2 rounded-full bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700"
         >
@@ -150,9 +153,32 @@ function Navbar({ itemCount, searchTerm, setSearchTerm, onCartClick }) {
             ) : null}
           </AnimatePresence>
         </MotionButton>
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-sm font-bold text-white shadow-md">
-          CK
-        </div>
+        <MotionButton
+          type="button"
+          onClick={isCustomer ? onProfileClick : onLoginRequired}
+          aria-label={isCustomer ? "Open profile" : "Open Gmail login"}
+          className={`inline-flex h-12 items-center gap-3 rounded-full shadow-md ${
+            isCustomer
+              ? "bg-white px-3 pr-4 text-gray-900 ring-1 ring-orange-100"
+              : "bg-gradient-to-br from-orange-500 to-red-500 px-4 text-sm font-bold text-white"
+          }`}
+        >
+          <span
+            className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black ${
+              isCustomer ? "bg-orange-50 text-orange-600" : "bg-white/15 text-white"
+            }`}
+          >
+            {isCustomer ? (currentUser.name || currentUser.email || "C").slice(0, 1).toUpperCase() : "P"}
+          </span>
+          <span className="hidden text-left sm:block">
+            <span className={`block text-[10px] font-bold uppercase tracking-[0.16em] ${isCustomer ? "text-gray-500" : "text-white/75"}`}>
+              Profile
+            </span>
+            <span className={`block max-w-28 truncate text-sm font-bold ${isCustomer ? "text-gray-900" : "text-white"}`}>
+              {isCustomer ? currentUser.name || currentUser.email : "Login"}
+            </span>
+          </span>
+        </MotionButton>
       </div>
     </motion.nav>
   );
@@ -366,7 +392,10 @@ function CartPanel({
   loading,
   error,
   handleSubmit,
+  currentUser,
 }) {
+  const isVerifiedCustomer = currentUser?.role === "customer";
+
   return (
     <motion.aside
       id="cart-panel"
@@ -621,6 +650,24 @@ function CartPanel({
             </div>
           </div>
 
+          <div className="rounded-2xl bg-orange-50 p-4 text-sm text-gray-700 ring-1 ring-orange-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-gray-900">Account checkout</p>
+                <p className="mt-1 text-gray-600">
+                  {currentUser?.role === "customer"
+                    ? `Signed in as ${currentUser.email || currentUser.name || "customer"}`
+                    : "Please sign in with Gmail before placing the order."}
+                </p>
+              </div>
+              {isVerifiedCustomer ? (
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+                  Verified
+                </span>
+              ) : null}
+            </div>
+          </div>
+
           {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
 
           <MotionButton
@@ -628,7 +675,7 @@ function CartPanel({
             disabled={loading}
             className="w-full rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 px-5 py-4 text-sm font-bold text-white shadow-lg hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Placing order..." : "Checkout now"}
+            {loading ? "Placing order..." : isVerifiedCustomer ? "Checkout now" : "Login to checkout"}
           </MotionButton>
         </div>
       </form>
@@ -636,7 +683,7 @@ function CartPanel({
   );
 }
 
-export default function OrderForm({ onOrderCreated, onTrackOrder }) {
+export default function OrderForm({ onOrderCreated, onTrackOrder, currentUser, onProfileClick, onLoginRequired }) {
   const [activeCategory, setActiveCategory] = useState("All");
   const [dietFilter, setDietFilter] = useState("all");
   const [sortBy, setSortBy] = useState("popular");
@@ -644,7 +691,14 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
   const [menuItems, setMenuItems] = useState([]);
   const [menuCategories, setMenuCategories] = useState([]);
   const [menuLoading, setMenuLoading] = useState(true);
-  const [cart, setCart] = useState({});
+  const [cart, setCart] = useState(() => {
+    try {
+      const stored = localStorage.getItem(CART_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
   const [checkout, setCheckout] = useState(INITIAL_CHECKOUT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -653,6 +707,7 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
   const [isPickingLocation, setIsPickingLocation] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const isVerifiedCustomer = currentUser?.role === "customer";
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -692,6 +747,10 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
     const timeout = window.setTimeout(() => setToastMessage(""), 1800);
     return () => window.clearTimeout(timeout);
   }, [toastMessage]);
+
+  useEffect(() => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  }, [cart]);
 
   const selectedArea = useMemo(() => {
     if (checkout.locality.trim()) return inferDeliveryAreaByLocality(checkout.locality);
@@ -871,6 +930,10 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
       setError("Enter your delivery locality and full street address to place the order.");
       return;
     }
+    if (!isVerifiedCustomer) {
+      onLoginRequired?.();
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -919,6 +982,7 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
       const data = await res.json();
       onOrderCreated(data);
       setCart({});
+      localStorage.removeItem(CART_STORAGE_KEY);
       setCheckout(INITIAL_CHECKOUT);
       setSuccessOrder(data);
     } catch (err) {
@@ -953,6 +1017,9 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         onCartClick={handleCartClick}
+        currentUser={currentUser}
+        onProfileClick={onProfileClick}
+        onLoginRequired={onLoginRequired}
       />
       <HeroSection
         featuredImage={menuItems[0]?.image || FALLBACK_MENU_ITEMS[0].image}
@@ -1065,6 +1132,7 @@ export default function OrderForm({ onOrderCreated, onTrackOrder }) {
           loading={loading}
           error={error}
           handleSubmit={handleSubmit}
+          currentUser={currentUser}
         />
       </div>
     </motion.section>

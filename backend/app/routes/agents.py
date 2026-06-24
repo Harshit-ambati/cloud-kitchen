@@ -5,7 +5,7 @@ from bson.objectid import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo.errors import PyMongoError
 
-from app.auth import CurrentUser, build_agent_filter, build_order_filter, get_current_user, log_access
+from app.dependencies.auth import CurrentUser, build_agent_filter, build_order_filter, get_current_user, log_access
 from app.db import agents, orders
 from app.models import AgentCreate, AgentUpdate
 from app.services.policy import enforce_not_delivery, enforce_ownership, filter_agent_update
@@ -48,7 +48,7 @@ def create_agent(agent: AgentCreate, current_user: CurrentUser = Depends(get_cur
 
     try:
         agent_data = agent.dict()
-        if current_user.role == "manager":
+        if current_user.is_branch_manager:
             agent_data["branch_id"] = current_user.branch_id
         agent_data["created_at"] = datetime.utcnow()
         agent_data["updated_at"] = agent_data["created_at"]
@@ -118,7 +118,7 @@ def update_agent(
     and only lat/lng/available fields.
     """
     # Policy: agents can only update themselves
-    if current_user.role in ("delivery", "agent"):
+    if current_user.is_delivery_agent:
         enforce_ownership(current_user, agent_id)
 
     try:

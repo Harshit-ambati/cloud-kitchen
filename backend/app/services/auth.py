@@ -1,49 +1,39 @@
-import os
+"""
+Backward Compatibility Shim — Services Auth
+----------------------------------------------
+Re-exports from new locations so existing imports work.
+All new code should import from app.auth.* directly.
+"""
+
+# flake8: noqa: F401
+
 import logging
-from datetime import datetime, timedelta
 from typing import Optional
 
-import bcrypt
-import jwt
 from fastapi import HTTPException
 from pymongo.errors import PyMongoError
 
+from app.auth.jwt import (
+    create_access_token,
+    decode_token,
+    JWT_SECRET,
+    JWT_ALGORITHM,
+    JWT_EXPIRY_HOURS,
+)
+from app.auth.password import hash_password, verify_password
 from app.db import db
+from app.roles.enums import Role
 
 logger = logging.getLogger(__name__)
 
-JWT_SECRET = os.getenv("JWT_SECRET", "cloud-kitchen-secret-key-change-in-production-please-change")
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "24"))
 users_collection = db["users"]
 
 
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    if not hashed:
-        return False
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
-
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    payload = data.copy()
-    payload["exp"] = datetime.utcnow() + (expires_delta or timedelta(hours=JWT_EXPIRY_HOURS))
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def decode_token(token: str) -> dict:
-    try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except jwt.ExpiredSignatureError as exc:
-        raise HTTPException(status_code=401, detail="Token has expired") from exc
-    except jwt.InvalidTokenError as exc:
-        raise HTTPException(status_code=401, detail="Invalid token") from exc
-
-
 def authenticate_user(email: str, password: str) -> dict:
+    """
+    Authenticate a user by email and password.
+    Returns the raw MongoDB document on success.
+    """
     try:
         user = users_collection.find_one({"email": email})
     except PyMongoError as exc:
@@ -60,14 +50,33 @@ def authenticate_user(email: str, password: str) -> dict:
     if not verify_password(password, stored_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    # Check if user is active
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=403, detail="Account is deactivated. Contact support.")
+
     return user
 
 
 def create_user_token(user: dict) -> str:
+    """Create a JWT token from a user document."""
+    role_str = user.get("role", "customer")
+
+    # Normalize to canonical value
+    try:
+        role_enum = Role.normalize(role_str)
+        role_display = role_enum.display_name
+        canonical_role = role_enum.value
+    except ValueError:
+        role_display = role_str
+        canonical_role = role_str
+
     return create_access_token(
         {
             "user_id": str(user["_id"]),
-            "role": user["role"],
+            "role": canonical_role,
             "branch_id": user.get("branch_id"),
+            "role_display": role_display,
+            "phone": user.get("phone", ""),
+            "name": user.get("name", ""),
         }
     )

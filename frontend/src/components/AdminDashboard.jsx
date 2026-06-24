@@ -89,7 +89,7 @@ const buildRouteGroups = (assignedOrders) => {
   return groups;
 };
 
-export default function App() {
+export default function App({ currentUser, onLogout }) {
   const [orders, setOrders] = useState([]);
   const [agents, setAgents] = useState([]);
   const [activeTab, setActiveTab] = useState("menu");
@@ -246,7 +246,7 @@ export default function App() {
     }
 
     if (activeTab === "agents") {
-          return (
+      return (
         <section className="space-y-6">
           <AgentForm onAgentCreated={handleAgentCreated} />
           <AgentList agents={agents} orders={orders} onRefresh={fetchAgents} />
@@ -273,11 +273,11 @@ export default function App() {
                 {agents.map((agent) => (
                   <Marker key={agent.id} position={[agent.lat, agent.lng]}>
                     <Popup>
-                        <div className="space-y-1">
-                          <strong>{agent.name}</strong>
-                          <p>Status: {agent.available ? "Available" : "Busy"}</p>
-                          <p>Current load: {orders.filter((order) => order.assigned_agent_id === agent.id && order.status !== "delivered" && order.status !== "cancelled").length}</p>
-                        </div>
+                      <div className="space-y-1">
+                        <strong>{agent.name}</strong>
+                        <p>Status: {agent.available ? "Available" : "Busy"}</p>
+                        <p>Current load: {orders.filter((order) => order.assigned_agent_id === agent.id && order.status !== "delivered" && order.status !== "cancelled").length}</p>
+                      </div>
                     </Popup>
                   </Marker>
                 ))}
@@ -442,9 +442,8 @@ export default function App() {
 
       <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col">
         <aside
-          className={`ck-sidebar fixed inset-y-0 left-0 z-50 flex w-[310px] max-w-[86vw] flex-col justify-between overflow-y-auto border-r border-orange-100 bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_38%,#fff1e6_100%)] px-6 py-7 transition-transform duration-300 ${
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={`ck-sidebar fixed inset-y-0 left-0 z-50 flex w-[310px] max-w-[86vw] flex-col justify-between overflow-y-auto border-r border-orange-100 bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_38%,#fff1e6_100%)] px-6 py-7 transition-transform duration-300 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
         >
           <div>
             <button
@@ -481,15 +480,13 @@ export default function App() {
                   key={tab.id}
                   type="button"
                   onClick={() => selectTab(tab.id)}
-                  className={`ck-nav-button w-full rounded-[24px] px-4 py-4 text-left transition ${
-                    activeTab === tab.id ? "is-active shadow-[0_16px_32px_rgba(15,23,42,0.22)]" : "hover:bg-white"
-                  }`}
+                  className={`ck-nav-button w-full rounded-[24px] px-4 py-4 text-left transition ${activeTab === tab.id ? "is-active shadow-[0_16px_32px_rgba(15,23,42,0.22)]" : "hover:bg-white"
+                    }`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p
-                      className={`text-[10px] font-semibold uppercase tracking-[0.22em] ${
-                        activeTab === tab.id ? "text-slate-300" : "text-slate-400"
-                      }`}
+                      className={`text-[10px] font-semibold uppercase tracking-[0.22em] ${activeTab === tab.id ? "text-slate-300" : "text-slate-400"
+                        }`}
                     >
                       {tab.eyebrow}
                     </p>
@@ -507,6 +504,19 @@ export default function App() {
           </div>
 
           <div className="space-y-4">
+            <div className="rounded-[24px] bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200 md:hidden">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Signed in</p>
+              <p className="mt-2 font-bold text-slate-900">{currentUser?.role_display || "Admin"}</p>
+              <p className="text-slate-500">{currentUser?.email || "Operations user"}</p>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="mt-3 w-full rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white"
+              >
+                Sign out
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={optimizeAssignments}
@@ -520,10 +530,9 @@ export default function App() {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-200">Live overview</p>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {statCards(stats).map((card) => (
-                    <div
-                      key={card.label}
-                      className={`ck-stat-card rounded-2xl p-3 ${
-                        card.tone === "dark" ? "bg-orange-500 text-white" : "bg-white/10 text-white"
+                  <div
+                    key={card.label}
+                    className={`ck-stat-card rounded-2xl p-3 ${card.tone === "dark" ? "bg-orange-500 text-white" : "bg-white/10 text-white"
                       }`}
                   >
                     <p className={`text-[11px] uppercase tracking-[0.18em] ${card.tone === "dark" ? "text-orange-50" : "text-slate-300"}`}>
@@ -578,14 +587,27 @@ export default function App() {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={optimizeAssignments}
-                    disabled={isDispatching}
-                    className="ck-command-button hidden rounded-full bg-orange-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60 md:inline-flex"
-                  >
-                    {isDispatching ? "Optimizing dispatch..." : "Optimize dispatch"}
-                  </button>
+                  <div className="hidden shrink-0 items-center gap-3 md:flex">
+                    <div className="rounded-full bg-white px-4 py-2 text-right text-xs shadow-sm ring-1 ring-slate-200">
+                      <p className="font-bold text-slate-900">{currentUser?.role_display || "Admin"}</p>
+                      <p className="text-slate-500">{currentUser?.email || "Signed in"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={optimizeAssignments}
+                      disabled={isDispatching}
+                      className="ck-command-button rounded-full bg-orange-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isDispatching ? "Optimizing dispatch..." : "Optimize dispatch"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onLogout}
+                      className="rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+                    >
+                      Sign out
+                    </button>
+                  </div>
                 </div>
 
                 <nav className="xl:hidden">
@@ -595,11 +617,10 @@ export default function App() {
                         key={tab.id}
                         type="button"
                         onClick={() => selectTab(tab.id)}
-                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                          activeTab === tab.id
+                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === tab.id
                             ? "bg-slate-950 text-white shadow-lg"
                             : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         {tab.label}
                       </button>
@@ -611,16 +632,14 @@ export default function App() {
                   {statCards(stats).map((card) => (
                     <div
                       key={card.label}
-                      className={`ck-stat-card rounded-[24px] px-4 py-4 shadow-sm ring-1 ${
-                        card.tone === "dark"
+                      className={`ck-stat-card rounded-[24px] px-4 py-4 shadow-sm ring-1 ${card.tone === "dark"
                           ? "bg-slate-950 text-white ring-slate-950"
                           : "bg-white text-slate-900 ring-orange-100"
-                      }`}
+                        }`}
                     >
                       <p
-                        className={`text-xs uppercase tracking-[0.18em] ${
-                          card.tone === "dark" ? "text-orange-200" : "text-slate-500"
-                        }`}
+                        className={`text-xs uppercase tracking-[0.18em] ${card.tone === "dark" ? "text-orange-200" : "text-slate-500"
+                          }`}
                       >
                         {card.label}
                       </p>

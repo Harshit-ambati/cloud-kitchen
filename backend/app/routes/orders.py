@@ -7,7 +7,7 @@ from bson.objectid import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pymongo.errors import PyMongoError
 
-from app.auth import CurrentUser, build_agent_filter, build_order_filter, get_current_user, log_access
+from app.dependencies.auth import CurrentUser, build_agent_filter, build_order_filter, get_current_user, log_access
 
 from app.db import agents, orders
 from app.models import AssignmentRequest, OrderCreate, OrderStatusUpdate
@@ -214,11 +214,16 @@ def calculate_route_eta_updates(route_batches, order_lookup, eta_origin_time):
 @router.post("/create")
 def create_order(
     order: OrderCreate,
+    current_user: CurrentUser = Depends(get_current_user),
     debug: bool = Query(False, description="Include branch selection trace"),
 ):
     """Create a new order with ETA calculation"""
     try:
         data = order.dict()
+        data["customer_user_id"] = current_user.user_id
+        if current_user.is_customer:
+            data["customer_phone"] = data.get("customer_phone") or ""
+            data["customer_name"] = data.get("customer_name") or current_user.name or "Customer"
 
         if data.get("user_lat") is None or data.get("user_lng") is None:
             raise HTTPException(status_code=400, detail="Missing user_lat or user_lng")
@@ -365,7 +370,7 @@ def get_agent_orders(agent_id: str, current_user: CurrentUser = Depends(get_curr
     """Get all orders assigned to a specific agent (filtered by role)"""
     try:
         # Delivery users can only see their own orders
-        if current_user.role in ("delivery", "agent") and agent_id != current_user.user_id:
+        if current_user.is_delivery_agent and agent_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Access denied: you can only view your own orders")
 
         query = build_order_filter(
